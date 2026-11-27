@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and business settings for a Kigali bar/shop owner or Bralirwa distributor.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "displayName": { "type": "string", "description": "Full display name of the user." },
+        "role": { "type": "string", "enum": ["BAR_OWNER", "DISTRIBUTOR"], "description": "Active operational role." },
+        "businessName": { "type": "string", "description": "Name of the bar, shop, or Bralirwa distribution depot." },
+        "neighborhood": { "type": "string", "description": "Kigali sector or neighborhood." },
+        "phone": { "type": "string", "description": "Optional Rwanda contact phone number (private to owner)." },
+        "lat": { "type": "number", "description": "Latitude in Kigali, Rwanda." },
+        "lng": { "type": "number", "description": "Longitude in Kigali, Rwanda." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["userId", "displayName", "role", "businessName", "neighborhood", "lat", "lng", "createdAt", "updatedAt"]
+    },
+    "DeliveryOrder": {
+      "title": "DeliveryOrder",
+      "description": "Real-time Bralirwa beverage delivery order with route optimization, live GPS tracking, digital payment settlement, and proof of delivery.",
+      "type": "object",
+      "properties": {
+        "barOwnerId": { "type": "string", "description": "UID of the bar or shop owner placing the commande." },
+        "barName": { "type": "string", "description": "Destination bar or shop name." },
+        "barNeighborhood": { "type": "string", "description": "Destination Kigali neighborhood." },
+        "barAddressNote": { "type": "string", "description": "Landmark or street note in Kigali." },
+        "barLat": { "type": "number", "description": "Destination bar latitude." },
+        "barLng": { "type": "number", "description": "Destination bar longitude." },
+        "distributorId": { "type": "string", "description": "UID of the assigned Bralirwa distributor (empty while PENDING)." },
+        "distributorName": { "type": "string", "description": "Display name of the assigned distributor." },
+        "depotName": { "type": "string", "description": "Nearest Kigali Bralirwa depot fulfilling the order." },
+        "driverLat": { "type": "number", "description": "Current live latitude of the delivery vehicle." },
+        "driverLng": { "type": "number", "description": "Current live longitude of the delivery vehicle." },
+        "itemsSummary": { "type": "string", "description": "Formatted breakdown of Bralirwa crates ordered." },
+        "totalCrates": { "type": "integer", "description": "Total number of beverage crates." },
+        "totalAmountRwf": { "type": "integer", "description": "Total order value in Rwandan Francs (RWF)." },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "ACCEPTED", "LOADING", "EN_ROUTE", "ARRIVED", "DELIVERED", "CANCELLED"],
+          "description": "Current delivery lifecycle status."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["MOMO_MTN", "AIRTEL_MONEY", "CARD_POS", "CASH_RWF"],
+          "description": "Digital or cash settlement method upon delivery."
+        },
+        "paymentStatus": { "type": "string", "enum": ["UNPAID", "PAID"], "description": "Payment settlement state." },
+        "paymentReference": { "type": "string", "description": "Digital payment receipt or MoMo transaction reference." },
+        "etaMinutes": { "type": "integer", "description": "Traffic-aware estimated time of arrival in minutes." },
+        "distanceKm": { "type": "number", "description": "Optimized road distance in kilometers." },
+        "trafficLevel": { "type": "string", "enum": ["LIGHT", "MODERATE", "HEAVY"], "description": "Real-time Kigali traffic condition." },
+        "routeSummary": { "type": "string", "description": "Optimized Kigali road corridor summary." },
+        "recipientName": { "type": "string", "description": "Name of the person accepting delivery." },
+        "signatureCaptured": { "type": "boolean", "description": "Whether recipient digital signature was captured." },
+        "signatureSvgPath": { "type": "string", "description": "Serialized normalized vector signature strokes." },
+        "photoVerified": { "type": "boolean", "description": "Whether delivery crate photo proof was uploaded." },
+        "photoCaption": { "type": "string", "description": "Optional note attached to verification photo." },
+        "photoThumbnailBase64": { "type": "string", "description": "Compressed Base64 JPEG thumbnail for cross-device POD verification." },
+        "deliveryNotes": { "type": "string", "description": "Special delivery or acceptance remarks." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "deliveredAt": { "type": "string", "format": "date-time", "description": "Optional server timestamp when delivery acceptance completed." }
+      },
+      "required": [
+        "barOwnerId", "barName", "barNeighborhood", "barAddressNote", "barLat", "barLng",
+        "distributorId", "distributorName", "depotName", "driverLat", "driverLng",
+        "itemsSummary", "totalCrates", "totalAmountRwf", "status",
+        "paymentMethod", "paymentStatus", "paymentReference",
+        "etaMinutes", "distanceKm", "trafficLevel", "routeSummary",
+        "recipientName", "signatureCaptured", "signatureSvgPath",
+        "photoVerified", "photoCaption", "photoThumbnailBase64", "deliveryNotes",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "OrderStatusEvent": {
+      "title": "OrderStatusEvent",
+      "description": "Immutable timestamped status update and notification audit entry for an order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Parent order document ID." },
+        "actorId": { "type": "string", "description": "UID of the party who triggered the update." },
+        "participantUids": { "type": "array", "description": "Denormalized participant UIDs (max 2) for flat authorization." },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "ACCEPTED", "LOADING", "EN_ROUTE", "ARRIVED", "DELIVERED", "CANCELLED"]
+        },
+        "title": { "type": "string", "description": "Short notification headline." },
+        "message": { "type": "string", "description": "Detailed status update message." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["orderId", "actorId", "participantUids", "status", "title", "message", "createdAt"]
+    },
+    "DeliveryRating": {
+      "title": "DeliveryRating",
+      "description": "Post-delivery personnel performance rating submitted by the bar owner after order completion.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Completed delivery order ID (matches document ID)." },
+        "barOwnerId": { "type": "string", "description": "UID of the bar owner submitting the rating." },
+        "barName": { "type": "string", "description": "Name of the bar or shop." },
+        "distributorId": { "type": "string", "description": "UID of the rated distributor." },
+        "distributorName": { "type": "string", "description": "Display name of the rated distributor." },
+        "stars": { "type": "integer", "description": "Overall rating from 1 to 5." },
+        "punctualityStars": { "type": "integer", "description": "Timeliness and route efficiency rating from 1 to 5." },
+        "handlingStars": { "type": "integer", "description": "Product and crate handling rating from 1 to 5." },
+        "comment": { "type": "string", "description": "Optional feedback comment." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["orderId", "barOwnerId", "barName", "distributorId", "distributorName", "stars", "punctualityStars", "handlingStars", "comment", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-private business profile and Kigali location settings."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/DeliveryOrder" },
+      "description": "Real-time Bralirwa delivery orders shared between bar owner and assigned distributor."
+    },
+    "/orders/{orderId}/events/{eventId}": {
+      "schema": { "$ref": "#/entities/OrderStatusEvent" },
+      "description": "Immutable delivery status updates and notification audit events."
+    },
+    "/ratings/{orderId}": {
+      "schema": { "$ref": "#/entities/DeliveryRating" },
+      "description": "One-per-order post-delivery rating for delivery personnel."
+    }
+  }
+}

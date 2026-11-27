@@ -1,0 +1,6 @@
+{
+  "name": "KigaliDistro",
+  "description": "Real-time beverage delivery tracking, traffic-aware route optimization, digital payment settlement, and proof-of-delivery verification for Bralirwa distributors and bar/shop owners in Kigali, Rwanda.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

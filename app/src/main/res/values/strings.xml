@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">KigaliDistro</string>
+    <string name="notification_channel_name">Delivery Status Updates</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="new_commande">New Bralirwa Commande</string>
+    <string name="delivery_acceptance">Delivery Acceptance</string>
+</resources>

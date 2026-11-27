@@ -1,0 +1,256 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+    function isValidUserProfile(d) {
+      return d.keys().hasOnly([
+               'userId', 'displayName', 'role', 'businessName', 'neighborhood', 'phone', 'lat', 'lng', 'createdAt', 'updatedAt'
+             ]) &&
+             d.userId is string && d.userId.size() > 0 && d.userId.size() <= 128 &&
+             d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 80 &&
+             d.role in ['BAR_OWNER', 'DISTRIBUTOR'] &&
+             d.businessName is string && d.businessName.size() > 0 && d.businessName.size() <= 100 &&
+             d.neighborhood is string && d.neighborhood.size() > 0 && d.neighborhood.size() <= 60 &&
+             (!('phone' in d) || (d.phone is string && d.phone.size() <= 24)) &&
+             (d.lat is float || d.lat is int) && d.lat >= -2.5 && d.lat <= -1.3 &&
+             (d.lng is float || d.lng is int) && d.lng >= 29.0 && d.lng <= 31.0 &&
+             d.createdAt is timestamp && d.createdAt <= request.time &&
+             d.updatedAt is timestamp && d.updatedAt <= request.time;
+    }
+
+    function isValidOrder(d) {
+      return d.barOwnerId is string && d.barOwnerId.size() > 0 && d.barOwnerId.size() <= 128 &&
+             d.barName is string && d.barName.size() > 0 && d.barName.size() <= 100 &&
+             d.barNeighborhood is string && d.barNeighborhood.size() > 0 && d.barNeighborhood.size() <= 60 &&
+             d.barAddressNote is string && d.barAddressNote.size() <= 200 &&
+             (d.barLat is float || d.barLat is int) && d.barLat >= -2.5 && d.barLat <= -1.3 &&
+             (d.barLng is float || d.barLng is int) && d.barLng >= 29.0 && d.barLng <= 31.0 &&
+             d.distributorId is string && d.distributorId.size() <= 128 &&
+             d.distributorName is string && d.distributorName.size() <= 100 &&
+             d.depotName is string && d.depotName.size() <= 100 &&
+             (d.driverLat is float || d.driverLat is int) && d.driverLat >= -2.5 && d.driverLat <= -1.3 &&
+             (d.driverLng is float || d.driverLng is int) && d.driverLng >= 29.0 && d.driverLng <= 31.0 &&
+             d.itemsSummary is string && d.itemsSummary.size() > 0 && d.itemsSummary.size() <= 600 &&
+             d.totalCrates is int && d.totalCrates >= 1 && d.totalCrates <= 500 &&
+             d.totalAmountRwf is int && d.totalAmountRwf >= 1000 && d.totalAmountRwf <= 50000000 &&
+             d.status in ['PENDING', 'ACCEPTED', 'LOADING', 'EN_ROUTE', 'ARRIVED', 'DELIVERED', 'CANCELLED'] &&
+             d.paymentMethod in ['MOMO_MTN', 'AIRTEL_MONEY', 'CARD_POS', 'CASH_RWF'] &&
+             d.paymentStatus in ['UNPAID', 'PAID'] &&
+             d.paymentReference is string && d.paymentReference.size() <= 80 &&
+             d.etaMinutes is int && d.etaMinutes >= 0 && d.etaMinutes <= 240 &&
+             (d.distanceKm is float || d.distanceKm is int) && d.distanceKm >= 0 && d.distanceKm <= 100 &&
+             d.trafficLevel in ['LIGHT', 'MODERATE', 'HEAVY'] &&
+             d.routeSummary is string && d.routeSummary.size() <= 200 &&
+             d.recipientName is string && d.recipientName.size() <= 100 &&
+             d.signatureCaptured is bool &&
+             d.signatureSvgPath is string && d.signatureSvgPath.size() <= 15000 &&
+             d.photoVerified is bool &&
+             d.photoCaption is string && d.photoCaption.size() <= 200 &&
+             d.photoThumbnailBase64 is string && d.photoThumbnailBase64.size() <= 85000 &&
+             d.deliveryNotes is string && d.deliveryNotes.size() <= 400 &&
+             d.createdAt is timestamp && d.createdAt <= request.time &&
+             d.updatedAt is timestamp && d.updatedAt <= request.time &&
+             (!('deliveredAt' in d) || (d.deliveredAt is timestamp && d.deliveredAt <= request.time));
+    }
+
+    function isValidOrderEvent(d, orderId) {
+      return d.keys().hasOnly(['orderId', 'actorId', 'participantUids', 'status', 'title', 'message', 'createdAt']) &&
+             d.orderId == orderId &&
+             d.actorId is string && d.actorId.size() > 0 && d.actorId.size() <= 128 &&
+             d.participantUids is list && d.participantUids.size() >= 1 && d.participantUids.size() <= 2 &&
+             d.participantUids[0] is string &&
+             (d.participantUids.size() == 1 || d.participantUids[1] is string) &&
+             d.status in ['PENDING', 'ACCEPTED', 'LOADING', 'EN_ROUTE', 'ARRIVED', 'DELIVERED', 'CANCELLED'] &&
+             d.title is string && d.title.size() > 0 && d.title.size() <= 100 &&
+             d.message is string && d.message.size() > 0 && d.message.size() <= 300 &&
+             d.createdAt is timestamp && d.createdAt <= request.time;
+    }
+
+    function isValidRating(d, orderId) {
+      return d.keys().hasOnly(['orderId', 'barOwnerId', 'barName', 'distributorId', 'distributorName', 'stars', 'punctualityStars', 'handlingStars', 'comment', 'createdAt']) &&
+             d.orderId == orderId &&
+             d.barOwnerId is string && d.barOwnerId.size() > 0 && d.barOwnerId.size() <= 128 &&
+             d.barName is string && d.barName.size() > 0 && d.barName.size() <= 100 &&
+             d.distributorId is string && d.distributorId.size() > 0 && d.distributorId.size() <= 128 &&
+             d.distributorName is string && d.distributorName.size() > 0 && d.distributorName.size() <= 100 &&
+             d.stars is int && d.stars >= 1 && d.stars <= 5 &&
+             d.punctualityStars is int && d.punctualityStars >= 1 && d.punctualityStars <= 5 &&
+             d.handlingStars is int && d.handlingStars >= 1 && d.handlingStars <= 5 &&
+             d.comment is string && d.comment.size() <= 400 &&
+             d.createdAt is timestamp && d.createdAt <= request.time;
+    }
+
+    function isValidOrderUpdate(d, e, uid) {
+      let changed = d.diff(e).affectedKeys();
+      let immutablesOk = d.barOwnerId == e.barOwnerId &&
+                         d.barName == e.barName &&
+                         d.barNeighborhood == e.barNeighborhood &&
+                         d.barAddressNote == e.barAddressNote &&
+                         d.barLat == e.barLat &&
+                         d.barLng == e.barLng &&
+                         d.itemsSummary == e.itemsSummary &&
+                         d.totalCrates == e.totalCrates &&
+                         d.totalAmountRwf == e.totalAmountRwf &&
+                         d.createdAt == e.createdAt;
+      let isAccept = e.status == 'PENDING' && e.distributorId == '' &&
+                     d.status == 'ACCEPTED' && d.distributorId == uid &&
+                     d.distributorName.size() > 0 &&
+                     changed.hasOnly([
+                       'distributorId', 'distributorName', 'depotName',
+                       'driverLat', 'driverLng', 'status',
+                       'etaMinutes', 'distanceKm', 'trafficLevel', 'routeSummary', 'updatedAt'
+                     ]);
+      let isTracking = e.distributorId == uid &&
+                       e.status in ['ACCEPTED', 'LOADING', 'EN_ROUTE', 'ARRIVED'] &&
+                       d.status in ['ACCEPTED', 'LOADING', 'EN_ROUTE', 'ARRIVED'] &&
+                       d.distributorId == e.distributorId &&
+                       changed.hasOnly([
+                         'status', 'driverLat', 'driverLng',
+                         'etaMinutes', 'distanceKm', 'trafficLevel', 'routeSummary', 'updatedAt'
+                       ]);
+      let isDeliver = (e.distributorId == uid || e.barOwnerId == uid) &&
+                      e.distributorId != '' &&
+                      e.status in ['EN_ROUTE', 'ARRIVED'] &&
+                      d.status == 'DELIVERED' &&
+                      d.distributorId == e.distributorId &&
+                      d.paymentStatus == 'PAID' &&
+                      d.paymentReference.size() >= 4 &&
+                      d.recipientName.size() >= 2 &&
+                      d.signatureCaptured == true &&
+                      d.signatureSvgPath.size() >= 5 &&
+                      d.photoVerified == true &&
+                      ('deliveredAt' in d) &&
+                      changed.hasOnly([
+                        'status', 'paymentMethod', 'paymentStatus', 'paymentReference',
+                        'recipientName', 'signatureCaptured', 'signatureSvgPath',
+                        'photoVerified', 'photoCaption', 'photoThumbnailBase64',
+                        'deliveryNotes', 'deliveredAt', 'updatedAt'
+                      ]);
+      let isCancel = e.barOwnerId == uid &&
+                     e.status in ['PENDING', 'ACCEPTED'] &&
+                     d.status == 'CANCELLED' &&
+                     d.distributorId == e.distributorId &&
+                     changed.hasOnly(['status', 'deliveryNotes', 'updatedAt']);
+      return e.status != 'DELIVERED' && e.status != 'CANCELLED' &&
+             immutablesOk &&
+             (isAccept || isTracking || isDeliver || isCancel);
+    }
+
+    // --- COLLECTION 1: OWNER-PRIVATE USER PROFILES (PII ISOLATED) ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       request.resource.data.userId == request.auth.uid &&
+                       isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(request.resource.data) &&
+                       request.resource.data.userId == resource.data.userId &&
+                       request.resource.data.createdAt == resource.data.createdAt &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'displayName', 'role', 'businessName', 'neighborhood', 'phone', 'lat', 'lng', 'updatedAt'
+                       ]);
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // --- COLLECTION 2: REAL-TIME BRALIRWA DELIVERY ORDERS ---
+    match /orders/{orderId} {
+      allow get: if isSignedIn() &&
+                    isValidId(orderId) &&
+                    (resource.data.barOwnerId == request.auth.uid ||
+                     resource.data.distributorId == request.auth.uid ||
+                     resource.data.status == 'PENDING');
+
+      allow list: if isSignedIn() &&
+                     (resource.data.barOwnerId == request.auth.uid ||
+                      resource.data.distributorId == request.auth.uid ||
+                      resource.data.status == 'PENDING');
+
+      allow create: if isSignedIn() &&
+                       isValidId(orderId) &&
+                       request.resource.data.keys().size() == 31 &&
+                       isValidOrder(request.resource.data) &&
+                       request.resource.data.barOwnerId == request.auth.uid &&
+                       request.resource.data.distributorId == '' &&
+                       request.resource.data.status == 'PENDING' &&
+                       request.resource.data.paymentStatus == 'UNPAID' &&
+                       request.resource.data.signatureCaptured == false &&
+                       request.resource.data.photoVerified == false &&
+                       !('deliveredAt' in request.resource.data);
+
+      allow update: if isSignedIn() &&
+                       isValidId(orderId) &&
+                       isValidOrder(request.resource.data) &&
+                       isValidOrderUpdate(request.resource.data, resource.data, request.auth.uid);
+
+      allow delete: if false;
+
+      // --- SUBCOLLECTION: IMMUTABLE STATUS & NOTIFICATION TIMELINE ---
+      match /events/{eventId} {
+        allow get: if isSignedIn() &&
+                      isValidId(orderId) &&
+                      isValidId(eventId) &&
+                      request.auth.uid in resource.data.participantUids;
+
+        allow list: if isSignedIn() &&
+                       request.auth.uid in resource.data.participantUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(orderId) &&
+                         isValidId(eventId) &&
+                         isValidOrderEvent(request.resource.data, orderId) &&
+                         request.resource.data.actorId == request.auth.uid &&
+                         request.auth.uid in request.resource.data.participantUids &&
+                         exists(/databases/$(database)/documents/orders/$(orderId)) &&
+                         (
+                           get(/databases/$(database)/documents/orders/$(orderId)).data.barOwnerId == request.auth.uid ||
+                           get(/databases/$(database)/documents/orders/$(orderId)).data.distributorId == request.auth.uid
+                         );
+
+        allow update, delete: if false;
+      }
+    }
+
+    // --- COLLECTION 3: DELIVERY PERSONNEL RATINGS (1 PER COMPLETED ORDER) ---
+    match /ratings/{orderId} {
+      allow get: if isSignedIn() &&
+                    isValidId(orderId) &&
+                    (resource.data.barOwnerId == request.auth.uid || resource.data.distributorId == request.auth.uid);
+
+      allow list: if isSignedIn() &&
+                     (resource.data.barOwnerId == request.auth.uid || resource.data.distributorId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+                       isValidId(orderId) &&
+                       isValidRating(request.resource.data, orderId) &&
+                       request.resource.data.barOwnerId == request.auth.uid &&
+                       exists(/databases/$(database)/documents/orders/$(orderId)) &&
+                       get(/databases/$(database)/documents/orders/$(orderId)).data.status == 'DELIVERED' &&
+                       get(/databases/$(database)/documents/orders/$(orderId)).data.barOwnerId == request.auth.uid &&
+                       get(/databases/$(database)/documents/orders/$(orderId)).data.distributorId == request.resource.data.distributorId;
+
+      allow update, delete: if false;
+    }
+  }
+}
